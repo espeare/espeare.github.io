@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Recipe Search</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 2em;
+      background-color: #f9f9f9;
+    }
+
+    input[type="text"] {
+      width: 100%;
+      padding: 0.5em;
+      font-size: 1em;
+      margin-bottom: 1.5em;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+    }
+
+    .document {
+      background: white;
+      border: 1px solid #ddd;
+      padding: 1em;
+      margin-bottom: 1em;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .document:hover {
+      background-color: #f0f0f0;
+    }
+
+    .title {
+      font-weight: bold;
+      font-size: 1.2em;
+    }
+
+    #fullView {
+        display: none;
+        position: fixed;
+        top: 10%;
+        left: 50%;
+        transform: translateX(-50%);
+        width: 80%;
+        max-width: 600px;
+        max-height: 60vh;          /* ✅ Limit the height */
+        overflow-y: auto;          /* ✅ Enable scroll inside the card */
+        background: #fff;
+        border: 2px solid #444;
+        border-radius: 12px;
+        box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+        padding: 2em;
+        z-index: 1000;
+    }
+
+    #fullView .close {
+      position: absolute;
+      top: 10px;
+      right: 20px;
+      cursor: pointer;
+      font-size: 1.5em;
+      color: #888;
+    }
+
+    #fullView h2 {
+      margin-top: 0;
+      font-size: 1.8em;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 0.5em;
+    }
+
+    #fullView ul {
+      padding-left: 1.2em;
+      margin-top: 0.5em;
+    }
+
+    #fullView p {
+      margin-top: 1em;
+      white-space: pre-wrap;
+    }
+
+    #overlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 999;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>Search Recipes</h1>
+  <input type="text" id="searchBox" placeholder="Search by title, ingredient, or instruction...">
+  <div id="resultsContainer"></div>
+
+  <!-- Overlay and Full-View Modal -->
+  <div id="overlay"></div>
+  <div id="fullView">
+    <span class="close" onclick="closeFullView()">&times;</span>
+    <h2 id="fullTitle"></h2>
+    <h3>Ingredients</h3>
+    <ul id="fullIngredients"></ul>
+    <h3>Instructions</h3>
+    <p id="fullInstructions"></p>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/minisearch@7.1.2/dist/umd/index.min.js"></script>
+  <script>
+    const recipes = [
+      {
+        id: 1,
+        title: 'Best Chocolate Cupcakes Recipe',
+        ingredients: ['1 cup all-purpose flour', '1 cup sugar', '1/2 cup cocoa powder', '1 tsp baking powder', '1/2 tsp baking soda', '1/2 tsp salt','1/2 tsp instant coffee','1/2 cup milk','1/4 cup oil','1 egg','1/2 tsp vanilla extract','1/2 cup boiling water'],
+        instructions: '1. Preheat oven to 325 F.\n2. Combine all ingredients together.\n3. Distribute batter in tin until wells are half full.\n4. Frost with cream cheese frosting and garnish with fruit.'
+      },
+      {
+        id: 2,
+        title: 'Pogacsa',
+        ingredients: ['3 cups flour','1 cup water','1 cooked potato','1/2 stick butter','1 pack yeast','1 pinch sugar','1 tbsp salt','1 spoonfull sour cream' ],
+        instructions: '1. Mix ingredients. Add additional flour as necessary to keep dough from sticking to side of bowl.\n2. Let dough rise 1 hour or until doubled in size.\n3. Roll out and brush with egg and sprinkle with grated cheese.\n4. Cut into squares and cook at 350 F until golden brown.'
+      },
+      {
+        id: 3,
+        title: 'Strawberry Shortcake Cake',
+        ingredients: ['2 1/2 cup all purpose flour','3 tsp baking powder','1/2 tsp salt','1 3/4 cup sugar','1/2 cup oil','2 eggs','2 egg whites','2 1/2 tsp vanilla extract','2/3 cup sour cream','3/4 cup milk','Filling: fresh strawberries','Frosting: 8 oz cream cheese','Frosting: 1 cup powdered sugar','Frosting: 3/4 tsp vanilla extract','Frosting: 2 1/4 cup heavy whipping cream (cold)'],
+        instructions: '1. Preheat oven to 350 F.\n2. Beat sugar, oil, eggs, egg whites, vanilla, and sour cream until combined. Add dry ingredients, then slowly add milk. Try to not overmix.\n3. Bake cake until golden brown and cool completely.\n4. Beatcream cheese, powdered sugar, and vanilla extract until smooth.\n5. Slowly pour heavy cream down side of bowl.\n6. Whip until cream holds stiff peak.\n7. Cut cake into layers, and then assemble with frosting and strawberries.'
+      }
+    ];
+
+    const miniSearch = new MiniSearch({
+      fields: ['title', 'ingredients', 'instructions'],
+      storeFields: ['title', 'ingredients', 'instructions'],
+      searchOptions: { prefix: true }
+    });
+
+    miniSearch.addAll(recipes);
+
+    const searchBox = document.getElementById('searchBox');
+    const resultsContainer = document.getElementById('resultsContainer');
+    const overlay = document.getElementById('overlay');
+    const fullView = document.getElementById('fullView');
+
+    const fullTitle = document.getElementById('fullTitle');
+    const fullIngredients = document.getElementById('fullIngredients');
+    const fullInstructions = document.getElementById('fullInstructions');
+
+    function displayResults(docs) {
+      resultsContainer.innerHTML = '';
+      if (docs.length === 0) {
+        resultsContainer.innerHTML = '<p>No results found.</p>';
+        return;
+      }
+
+      docs.forEach(doc => {
+        const div = document.createElement('div');
+        div.className = 'document';
+        div.innerHTML = `<div class="title">${doc.title}</div>`;
+        div.addEventListener('click', () => showFullView(doc));
+        resultsContainer.appendChild(div);
+      });
+    }
+
+    function showFullView(doc) {
+      fullTitle.textContent = doc.title;
+      fullIngredients.innerHTML = '';
+      doc.ingredients.forEach(ing => {
+        const li = document.createElement('li');
+        li.textContent = ing;
+        fullIngredients.appendChild(li);
+      });
+      fullInstructions.textContent = doc.instructions;
+      fullView.style.display = 'block';
+      overlay.style.display = 'block';
+    }
+
+    function closeFullView() {
+      fullView.style.display = 'none';
+      overlay.style.display = 'none';
+    }
+
+    searchBox.addEventListener('input', () => {
+    const query = searchBox.value.trim();
+    if (query === '') {
+        displayResults(recipes);
+    } else {
+        // Use AND to match all words in query
+        const results = miniSearch.search(query, {
+        prefix: true,
+        combineWith: 'AND'    // <-- Require all words to be present
+        });
+        displayResults(results);
+    }
+    });
+
+
+    overlay.addEventListener('click', closeFullView);
+
+    // Show all on load
+    displayResults(recipes);
+  </script>
+</body>
+</html>
